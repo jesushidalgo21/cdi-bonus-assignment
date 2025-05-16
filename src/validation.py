@@ -1,35 +1,100 @@
-from pyspark.sql import functions as F
+from pyspark.sql import DataFrame
+from pyspark.sql.functions import col, abs as spark_abs
+from src.logger import Logger
 
-def validate_cdc_data(df):
-    """
-    Valida reglas críticas en los datos CDC antes de procesar.
-    Retorna (es_valido: bool, mensajes_error: list[str])
-    """
-    errors = []
+logger = Logger().get_logger()
+
+class CDCDataValidator:
+    """Validador de datos CDC con reglas de negocio específicas"""
+    REQUIRED_FIELDS = ["account_id", "event_time", "amount"]
+    TRANSACTION_TYPES = {
+        "WALLET_CREATED": "WALLET_CREATED",
+        "DEPOSIT": "DEPOSIT",
+        "TRANSFER_IN": "TRANSFER_IN"
+    }
+
+    def __init__(self, df: DataFrame):
+        """
+        Inicializa el validador con un DataFrame de datos CDC
+        
+        Args:
+            df (DataFrame): DataFrame con datos CDC a validar
+        """
+        self.df = df
+        self.errors = []
     
-    # Regla 1: No hay cuentas creadas con monto != 0
-    invalid_creations = df.filter(
-        (F.col("transaction_type") == "WALLET_CREATED") & 
-        (F.abs(F.col("amount")) > 0.001)  # Evita falsos positivos por floats
-    )
-    if invalid_creations.count() > 0:
-        errors.append(f"⚠️ {invalid_creations.count()} cuentas creadas con monto distinto de cero")
+    def validate(self) -> tuple[bool, list[str]]:
+        """
+        Ejecuta todas las validaciones configuradas
+        
+        Returns:
+            tuple[bool, list[str]]: (True si es válido, lista de mensajes de error)
+        """
+        logger.info("Iniciando validación completa de datos CDC")
+        
+        self._validate_wallet_creation()
+        self._validate_deposit_transactions()
+        self._validate_required_fields()
+        
+        is_valid = len(self.errors) == 0
+        validation_result = (is_valid, self.errors.copy())
+        
+        if is_valid:
+            logger.info("✅ Todos los datos CDC pasaron la validación")
+        else:
+            logger.error(f"❌ Validación fallida con {len(self.errors)} error(es)")
+        
+        return validation_result
     
-    # Regla 2: No hay montos negativos en DEPOSIT/TRANSFER_IN
-    invalid_deposits = df.filter(
-        F.col("transaction_type").isin("DEPOSIT", "TRANSFER_IN") & 
-        (F.col("amount") < 0)
-    )
-    if invalid_deposits.count() > 0:
-        errors.append(f"⚠️ {invalid_deposits.count()} depósitos con montos negativos")
+    def _validate_wallet_creation(self) -> None:
+        """Valida que cuentas creadas no tengan montos distintos de cero"""
+        invalid_records = self.df.filter(
+            (col("transaction_type") == self.TRANSACTION_TYPES["WALLET_CREATED"]) &
+            (spark_abs(col("amount")) > 0.001)
+        )
+        
+        count = invalid_records.count()
+        if count > 0:
+            message = f"⚠️ {count} cuentas creadas con monto distinto de cero"
+            self.errors.append(message)
+            logger.warning(message)
     
-    # Regla 3: Integridad de campos obligatorios
-    missing_fields = df.filter(
-        F.col("account_id").isNull() | 
-        F.col("event_time").isNull() | 
-        F.col("amount").isNull()
-    )
-    if missing_fields.count() > 0:
-        errors.append(f"⚠️ {missing_fields.count()} registros con campos obligatorios nulos")
+    def _validate_deposit_transactions(self) -> None:
+        """Valida que depósitos no tengan montos negativos"""
+        invalid_records = self.df.filter(
+            col("transaction_type").isin(
+                self.TRANSACTION_TYPES["DEPOSIT"],
+                self.TRANSACTION_TYPES["TRANSFER_IN"]
+            ) &
+            (col("amount") < 0)
+        )
+        
+        count = invalid_records.count()
+        if count > 0:
+            message = f"⚠️ {count} depósitos/transferencias con monto negativo"
+            self.errors.append(message)
+            logger.warning(message)
     
-    return (len(errors) == 0, errors)
+    def _validate_required_fields(self) -> None:
+        """Valida que campos obligatorios no sean nulos"""
+        # Verificar existencia de columnas
+        missing_cols = [f for f in self.REQUIRED_FIELDS if f not in self.df.columns]
+        if missing_cols:
+            message = f"❌ Faltan columnas requeridas: {missing_cols}"
+            self.errors.append(message)
+            logger.error(message)
+            return
+        
+        # Verificar valores nulos
+        null_condition = None
+        for field in self.REQUIRED_FIELDS:
+            cond = col(field).isNull()
+            null_condition = cond if null_condition is None else null_condition | cond
+        
+        invalid_records = self.df.filter(null_condition)
+        count = invalid_records.count()
+        
+        if count > 0:
+            message = f"⚠️ {count} registros con campos obligatorios nulos"
+            self.errors.append(message)
+            logger.warning(message)
