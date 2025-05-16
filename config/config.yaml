@@ -1,0 +1,16 @@
+paths:
+  cdc: data/cdc/
+  wallet_history: data/wallet_history
+  interest_output: data/interest
+  cdi_rates: data/cdi_rates
+
+postgres:
+  host: "postgres"
+  port: 5432
+  database: "wallet_db"
+  user: "wallet_user"
+  password: "wallet_pass"
+  driver: "org.postgresql.Driver"
+  schema: "wallet"
+  wallet_history_table: "wallet_history"
+  interest_payments_table: "interest_payments"
