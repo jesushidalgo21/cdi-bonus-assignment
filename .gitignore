@@ -1,0 +1,7 @@
+# Ignorar datos generados
+/data/cdi_rate/
+
+# Caches y archivos temporales
+__pycache__/
+/*.pyc
+/.pytest_cache/
