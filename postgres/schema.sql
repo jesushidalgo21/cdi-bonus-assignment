@@ -4,10 +4,17 @@ CREATE SCHEMA IF NOT EXISTS wallet;
 CREATE TABLE wallet.wallet_history (
     account_id UUID NOT NULL,
     user_id UUID NOT NULL,
-    balance DECIMAL(10,2) NOT NULL,
-    partition_date TEXT NOT NULL,
-    PRIMARY KEY (account_id, partition_date)
+    balance DECIMAL(18,2) NOT NULL,
+    balance_previous DECIMAL(18,2) NOT NULL,
+    immovable_balance DECIMAL(18,2) NOT NULL,
+    last_movement_ts TIMESTAMP,
+    total_deposits DECIMAL(18,2) NOT NULL DEFAULT 0,
+    total_withdrawals DECIMAL(18,2) NOT NULL DEFAULT 0,
+    transactions_count INTEGER DEFAULT 0,
+    partition_date DATE NOT NULL,
+    PRIMARY KEY (account_id, user_id, partition_date)
 ) PARTITION BY RANGE (partition_date);
+
 
 -- Tabla de transacciones de interés
 CREATE TABLE wallet.interest_payments (

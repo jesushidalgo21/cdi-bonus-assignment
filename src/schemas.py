@@ -4,6 +4,11 @@ wallet_history_schema = StructType([
     StructField("account_id", StringType(), True),
     StructField("user_id", StringType(), True),
     StructField("balance", DoubleType(), True),
+    StructField("balance_previous", DoubleType(), True),
+    StructField("immovable_balance", DoubleType(), True),
+    StructField("last_movement_ts", TimestampType(), True),
+    StructField("total_deposits", DoubleType(), True),
+    StructField("total_withdrawals", DoubleType(), True),
     StructField("transactions_count", IntegerType(), True),
     StructField("partition_date", StringType(), True),
 ])

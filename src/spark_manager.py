@@ -25,9 +25,9 @@ class SparkSessionManager:
             self._spark_session = SparkSession.builder \
                 .appName("DefaultAppName") \
                 .config("spark.driver.extraJavaOptions", "-Dlog4j.configuration=file:/app/log4j.properties") \
-                .config("spark.sql.shuffle.partitions", "4") \
-                .config("spark.executor.memory", "2g") \
-                .config("spark.driver.memory", "2g") \
+                .config("spark.sql.shuffle.partitions", "200") \
+                .config("spark.executor.memory", "4g") \
+                .config("spark.driver.memory", "8g") \
                 .config("spark.sql.execution.arrow.pyspark.enabled", "true") \
                 .config("spark.sql.adaptive.enabled", "true") \
                 .getOrCreate()
