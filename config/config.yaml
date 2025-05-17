@@ -14,3 +14,4 @@ postgres:
   schema: "wallet"
   wallet_history_table: "wallet_history"
   interest_payments_table: "interest_payments"
+  interest_audit_log_table: "interest_audit_log"

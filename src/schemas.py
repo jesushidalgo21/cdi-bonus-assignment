@@ -31,3 +31,18 @@ cdc_data_schema = StructType([
     StructField("amount", IntegerType(), nullable=False),
     StructField("event_time", TimestampType(), nullable=False),
 ])
+
+audit_log_schema = StructType([
+    StructField("job_id", StringType(), nullable=False),
+    StructField("job_timestamp", TimestampType(), nullable=False),
+    StructField("user_id", StringType(), nullable=False),
+    StructField("account_id", StringType(), nullable=False),
+    StructField("qualified", BooleanType(), nullable=False),
+    StructField("reason", StringType(), nullable=True),
+    StructField("relevant_balance", DoubleType(), nullable=True),
+    StructField("calculated_interest", DoubleType(), nullable=True),
+    StructField("interest_rate", DoubleType(), nullable=True),
+    StructField("process_status", StringType(), nullable=False),
+    StructField("error_description", StringType(), nullable=True),
+    StructField("partition_date", StringType(), nullable=False)
+])

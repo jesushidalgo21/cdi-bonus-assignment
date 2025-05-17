@@ -16,7 +16,7 @@ class WalletHistoryGenerator:
         pass
 
     def _read_cdc_data(self, cdc_path: str):
-        logger.info(f"Leyend_dateo CDC desde: {cdc_path}")
+        logger.info(f"Leyendo CDC desde: {cdc_path}")
         return spark.read.parquet(cdc_path)
 
     def _filter_by_date_range(self, df, start_date: str, end_date: str):
