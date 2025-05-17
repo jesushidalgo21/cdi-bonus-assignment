@@ -1,69 +1,109 @@
-from pyspark.sql import functions as F
-from pyspark.sql.window import Window
-from pyspark.sql import SparkSession
-import logging
-from src.validation import validate_cdc_data
-from src.schemas import wallet_history_schema  
+from pyspark.sql import Window
+from pyspark.sql.functions import (
+    to_date, col, when, abs, sum, last, count
+)
+from src.validation import CDCDataValidator
+from src.schemas import wallet_history_schema
 from src.utils import get_postgres_connection, load_config
+from src.logger import Logger
+from src.spark_manager import SparkSessionManager
 
-logger = logging.getLogger(__name__)
+logger = Logger().get_logger()
+spark = SparkSessionManager().get_spark_session("WalletHistory")
 
-def generate_wallet_history(cdc_path: str, spark: SparkSession):
-    try:
-        logger.info(f"Leyendo datos CDC desde: {cdc_path}")
-        df = spark.read.parquet(cdc_path)
-        
-        # Validación
-        is_valid, errors = validate_cdc_data(df)
+class WalletHistoryGenerator:
+    def __init__(self):
+        pass
+
+    def _read_cdc_data(self, cdc_path: str):
+        logger.info(f"Leyendo CDC desde: {cdc_path}")
+        return spark.read.parquet(cdc_path)
+
+    def _filter_by_date_range(self, df, start_date: str, end_date: str):
+        logger.info(f"Filtrando eventos entre {start_date} y {end_date}")
+        df = df.withColumn("event_date", to_date("event_time"))
+        return df.filter((col("event_date") >= start_date) & (col("event_date") <= end_date))
+
+    def _validate_data(self, df):
+        logger.info("Validando datos CDC")
+        validator = CDCDataValidator(df)
+        is_valid, errors = validator.validate()
         if not is_valid:
-            logger.error("Errores de validación:\n" + "\n".join(errors))
-            raise ValueError("\n".join(errors))
+            error_msg = "\n".join(errors)
+            logger.error(f"❌ Errores de validación:\n{error_msg}")
+            raise ValueError(error_msg)
+        return df
 
-        logger.info("Normalizando montos...")
-        df = df.withColumn(
+    def _normalize_amounts(self, df):
+        logger.info("Normalizando montos")
+        return df.withColumn(
             "normalized_amount",
-            F.when(F.col("transaction_type").isin("WITHDRAWAL", "TRANSFER_OUT"), 
-                   -F.abs(F.col("amount")))
-             .otherwise(F.abs(F.col("amount")))
+            when(col("transaction_type").isin("WITHDRAWAL", "TRANSFER_OUT"),
+                 -abs(col("amount")))
+             .otherwise(abs(col("amount")))
         )
 
-        logger.info("Calculando balance cronológico...")
-        window_spec = Window.partitionBy("account_id").orderBy("event_time").rowsBetween(Window.unboundedPreceding, Window.currentRow)
-        df = df.withColumn("running_balance", F.sum("normalized_amount").over(window_spec))
+    def _calculate_running_balance(self, df):
+        logger.info("Calculando balance cronológico por cuenta")
+        window_spec = Window.partitionBy("account_id").orderBy("event_time") \
+            .rowsBetween(Window.unboundedPreceding, Window.currentRow)
+        return df.withColumn("running_balance", sum("normalized_amount").over(window_spec))
 
-        logger.info("Agregando columna de fecha formateada...")
-        df = df.withColumn("partition_date", F.to_date(F.col("event_time")))
+    def _prepare_final_dataset(self, df, start_date: str, end_date: str):
+        logger.info("Agregando columnas auxiliares")
+        df = df.withColumn("partition_date", to_date(col("event_time")))
 
-        logger.info("Calculando balance diario por cuenta y usuario...")
+        logger.info("Agregando balance diario por cuenta y usuario")
         final_balance = df.groupBy("account_id", "user_id", "partition_date").agg(
-            F.last("running_balance").alias("balance"),
-            F.count("*").alias("transactions_count")
-        )
+            last("running_balance").alias("balance"),
+            count("*").alias("transactions_count")
+        ).filter((col("partition_date") >= start_date) & (col("partition_date") <= end_date))
 
-        if final_balance.rdd.isEmpty():
-            print("No hay datos para escribir en wallet_history.")
-            return
+        return final_balance
 
-        logger.info("Casteando columnas al schema esperado...")
+    def _cast_to_schema(self, df):
+        logger.info("Casteando columnas al schema esperado")
         for field in wallet_history_schema.fields:
-            if field.name in final_balance.columns:
-                final_balance = final_balance.withColumn(field.name, F.col(field.name).cast(field.dataType))
+            if field.name in df.columns:
+                df = df.withColumn(field.name, col(field.name).cast(field.dataType))
+        return df
 
-        logger.info("Escribiendo resultados en PostgreSQL...")
-        pg_conf = load_config()['postgres']
+    def _write_to_postgres(self, df):
+        logger.info("Conectando a PostgreSQL para escritura")
+        pg_conf = load_config()["postgres"]
         jdbc_url, connection_props = get_postgres_connection(pg_conf)
-
         table = f"{pg_conf['schema']}.{pg_conf['wallet_history_table']}"
 
-        final_balance.write.jdbc(
+        df.write.jdbc(
             url=jdbc_url,
             table=table,
             mode="overwrite",
             properties=connection_props
         )
+        logger.info("✅ Carga exitosa en PostgreSQL")
 
-        logger.info("Carga exitosa en PostgreSQL.")
+    def load_wallet_history(self, cdc_path: str, start_date: str, end_date: str):
+        try:
+            # Pipeline de procesamiento
+            df = self._read_cdc_data(cdc_path)
+            df = self._filter_by_date_range(df, start_date, end_date)
 
-    except Exception as e:
-        logger.critical(f"Error inesperado: {str(e)}", exc_info=True)
-        raise
+            if df.rdd.isEmpty():
+                logger.warning("⚠️ No se encontraron datos en el rango de fechas")
+                return
+
+            df = self._validate_data(df)
+            df = self._normalize_amounts(df)
+            df = self._calculate_running_balance(df)
+            final_balance = self._prepare_final_dataset(df, start_date, end_date)
+
+            if final_balance.rdd.isEmpty():
+                logger.warning("⚠️ No hay datos para cargar en wallet_history luego del procesamiento")
+                return
+
+            final_balance = self._cast_to_schema(final_balance)
+            self._write_to_postgres(final_balance)
+
+        except Exception as e:
+            logger.critical(f"💥 Error inesperado en generate_wallet_history: {e}", exc_info=True)
+            raise

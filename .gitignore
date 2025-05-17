@@ -1,5 +1,5 @@
 # Ignorar datos generados
-/data/cdi_rate/
+/data/cdi_rates/
 
 # Caches y archivos temporales
 __pycache__/
