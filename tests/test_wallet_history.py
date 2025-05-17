@@ -16,11 +16,11 @@ def spark():
 @pytest.fixture
 def sample_cdc_data(spark):
     data = [
-        ("acc1", "user1", "WALLET_CREATED", 0.0, datetime.fromisoformat("2024-01-01T09:00:00")),
-        ("acc1", "user1", "DEPOSIT", 100.0, datetime.fromisoformat("2024-01-01T10:00:00")),
-        ("acc1", "user1", "WITHDRAWAL", 50.0, datetime.fromisoformat("2024-01-01T12:00:00")),
-        ("acc1", "user1", "TRANSFER_OUT", 25.0, datetime.fromisoformat("2024-01-02T10:00:00")),
-        ("acc1", "user1", "DEPOSIT", 200.0, datetime.fromisoformat("2024-01-02T15:00:00")),
+        ("acc1", "user1", "WALLET_CREATED", 0, datetime.fromisoformat("2024-01-01T09:00:00")),
+        ("acc1", "user1", "DEPOSIT", 100, datetime.fromisoformat("2024-01-01T10:00:00")),
+        ("acc1", "user1", "WITHDRAWAL", 50, datetime.fromisoformat("2024-01-01T12:00:00")),
+        ("acc1", "user1", "TRANSFER_OUT", 25, datetime.fromisoformat("2024-01-02T10:00:00")),
+        ("acc1", "user1", "DEPOSIT", 200, datetime.fromisoformat("2024-01-02T15:00:00")),
     ]
     return spark.createDataFrame(data, cdc_data_schema)
 
@@ -68,9 +68,9 @@ def test_wallet_history_empty_data(tmp_path, spark, empty_cdc_data):
 
 def test_wallet_history_negative_balance(tmp_path, spark):
     data = [
-        ("acc1", "user1", "WALLET_CREATED", 0.0, datetime.fromisoformat("2024-01-01T07:00:00")),
-        ("acc1", "user1", "WITHDRAWAL", 300.0, datetime.fromisoformat("2024-01-01T10:00:00")),
-        ("acc1", "user1", "DEPOSIT", 100.0, datetime.fromisoformat("2024-01-01T12:00:00")),
+        ("acc1", "user1", "WALLET_CREATED", 0, datetime.fromisoformat("2024-01-01T07:00:00")),
+        ("acc1", "user1", "WITHDRAWAL", 300, datetime.fromisoformat("2024-01-01T10:00:00")),
+        ("acc1", "user1", "DEPOSIT", 100, datetime.fromisoformat("2024-01-01T12:00:00")),
     ]
     schema = cdc_data_schema
     df = spark.createDataFrame(data, schema)

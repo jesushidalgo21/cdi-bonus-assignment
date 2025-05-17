@@ -116,6 +116,10 @@ class WalletHistoryGenerator:
 
             final_df = self._generate_daily_balances(df_balances, start_date, end_date)
 
+            if final_df.count() == 0:
+                logger.info("No hay datos para escribir en wallet_history, omitiendo escritura.")
+                return
+        
             pg_config = load_config()["postgres"]
             url, props = get_postgres_connection(pg_config)
             table = f"{pg_config['schema']}.{pg_config['wallet_history_table']}"
@@ -126,7 +130,6 @@ class WalletHistoryGenerator:
                 "reWriteBatchedInserts": "true"
             })
 
-            # OPTIMIZACIÓN: Aumenta el número de particiones para la escritura si tienes recursos
             num_partitions = max(8, final_df.rdd.getNumPartitions())
             final_df.repartition(num_partitions).write.jdbc(
                 url=url,
