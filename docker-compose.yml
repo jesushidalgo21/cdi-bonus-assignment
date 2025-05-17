@@ -24,6 +24,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - cdi-network
 
   tests:
     build: .
@@ -31,14 +33,18 @@ services:
       - .:/app
     working_dir: /app
     command: ["python3", "-m", "pytest", "tests/", "-v"]
+    networks:
+      - cdi-network
 
   postgres:
     image: postgres:13
     container_name: postgres-container
+    hostname: postgres
     environment:
       POSTGRES_USER: wallet_user
       POSTGRES_PASSWORD: wallet_pass
       POSTGRES_DB: wallet_db
+      POSTGRES_HOST_AUTH_METHOD: trust
     volumes:
       - ./postgres:/docker-entrypoint-initdb.d
       - postgres_data:/var/lib/postgresql/data
@@ -50,6 +56,37 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      cdi-network:
+        aliases:
+          - postgres
+
+  dashboard:
+    build:
+      context: ./dashboard
+    volumes:
+      - ./dashboard:/app
+    ports:
+      - "8501:8501"
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=wallet_db
+      - POSTGRES_USER=wallet_user
+      - POSTGRES_PASSWORD=wallet_pass
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - cdi-network
+
+networks:
+  cdi-network:
+    driver: bridge
 
 volumes:
   postgres_data:

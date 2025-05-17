@@ -142,7 +142,7 @@ class InterestCalculator:
                 relevant_balance=record[4],
                 calculated_interest=record[5],
                 interest_rate=record[6],
-                status=record[7],
+                process_status=record[7],
                 error_desc=record[8],
                 partition_date=record[9]
             )
@@ -187,7 +187,7 @@ class InterestCalculator:
                     relevant_balance=0.0,
                     calculated_interest=0.0,
                     interest_rate=0.0,
-                    status="error",
+                    process_status="error",
                     error_desc=error_msg,
                     partition_date=start_date,
                 )
@@ -216,7 +216,7 @@ class InterestCalculator:
                 relevant_balance=0.0,
                 calculated_interest=0.0,
                 interest_rate=0.0,
-                status="error",
+                process_status="error",
                 error_desc=error_msg,
                 partition_date=start_date
             )

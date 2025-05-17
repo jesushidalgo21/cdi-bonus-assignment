@@ -22,7 +22,7 @@ class InterestAuditLogger:
                     relevant_balance: float,
                     calculated_interest: float,
                     interest_rate: float,
-                    status: str = "success",
+                    process_status: str = "success",
                     error_desc: str = None,
                     partition_date: str = None) -> None:
         """
@@ -36,7 +36,7 @@ class InterestAuditLogger:
             relevant_balance: Balance considerado
             calculated_interest: Interés calculado
             interest_rate: Tasa aplicada
-            status: Estado del proceso
+            process_status: Estado del proceso
             error_desc: Descripción de error si aplica
             partition_date: Fecha de partición
         """
@@ -50,7 +50,7 @@ class InterestAuditLogger:
             "relevant_balance": relevant_balance if relevant_balance is not None else 0.0,
             "calculated_interest": calculated_interest if calculated_interest is not None else 0.0, 
             "interest_rate": interest_rate if interest_rate is not None else 0.0,
-            "process_status": status or "unknown",
+            "process_status": process_status or "unknown",
             "error_description": error_desc,
             "partition_date": partition_date
         }

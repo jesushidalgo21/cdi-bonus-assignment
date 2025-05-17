@@ -33,7 +33,7 @@ CREATE TABLE wallet.interest_audit_log (
     relevant_balance DECIMAL(10,2) NOT NULL,
     calculated_interest DECIMAL(10,2) NOT NULL,
     interest_rate DECIMAL(5,4) NOT NULL,
-    status TEXT DEFAULT 'success',
+    process_status TEXT DEFAULT 'success',
     error_desc TEXT,
     partition_date DATE NOT NULL
 ) PARTITION BY RANGE (partition_date);
