@@ -73,7 +73,7 @@ Este pipeline cubre todo el flujo para:
 
 2. Clonar el repositorio:
    ```bash
-   git clone https://github.com/tu_usuario/cdi-bonus-assignment.git
+   git clone https://github.com/jesushidalgo21/cdi-bonus-assignment.git
    cd cdi-bonus-assignment
 3. Revisar y ajustar `config/config.yaml` si fuera necesario (rutas, credenciales PostgreSQL).
 4. Construir y levantar servicios con Docker Compose:
