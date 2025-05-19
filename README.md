@@ -55,23 +55,28 @@ Este pipeline cubre todo el flujo para:
 
 ## Requisitos Previos
 
-* Docker y Docker Compose
+* **Docker y Docker Compose** (versión 20.10.7 o superior)
+  - [Guía de instalación para Windows](https://docs.docker.com/desktop/install/windows-install/)
+  - [Guía de instalación para Mac](https://docs.docker.com/desktop/install/mac-install/)
+  - [Guía de instalación para Linux](https://docs.docker.com/engine/install/)
+  
 * Java 11 (requerido por Spark)
-* Python 3.9+
+* Python 3.9+ (solo necesario para desarrollo local fuera de Docker)
 * DBeaver (o cliente SQL similar) para exploración de datos
-
 ---
 
 ## Instalación y Configuración
 
-1. Clonar el repositorio:
+1. **Instalar Docker** (si no lo tienes):
+   - Sigue las guías oficiales según tu sistema operativo en los links de Requisitos Previos
+   - Después de instalar, inicia Docker Desktop y espera a que esté completamente operativo
 
+2. Clonar el repositorio:
    ```bash
    git clone https://github.com/tu_usuario/cdi-bonus-assignment.git
    cd cdi-bonus-assignment
-   ```
-2. Revisar y ajustar `config/config.yaml` si fuera necesario (rutas, credenciales PostgreSQL).
-3. Construir y levantar servicios con Docker Compose:
+3. Revisar y ajustar `config/config.yaml` si fuera necesario (rutas, credenciales PostgreSQL).
+4. Construir y levantar servicios con Docker Compose:
 
    ```bash
    docker-compose up --build
@@ -81,14 +86,24 @@ Este pipeline cubre todo el flujo para:
 
 ## Ejecución del Pipeline
 
-Ejecuta el orquestador principal:
+Para ejecutar el pipeline dentro del contenedor Docker:
 
 ```bash
-python3 run_pipeline.py --start YYYY-MM-DD [--end YYYY-MM-DD]
+docker exec -it pyspark-container python3 run_pipeline.py --start YYYY-MM-DD [--end YYYY-MM-DD]
 ```
 
 * Sin `--end`: calcula solo la fecha de inicio.
 * Con `--end`: calcula el rango de fechas inclusivo.
+
+Ejemplos:
+```bash
+docker exec -it pyspark-container python3 run_pipeline.py --start 2024-08-28
+```
+
+```bash
+docker exec -it pyspark-container python3 run_pipeline.py --start 2024-05-01 --end 2024-10-07
+```
+* Recomendación: Se recomienda ejecutar el segundo ejemplo, ya que la fuente de datos CDC contiene información dentro de ese rango específico (2024-05-01 a 2024-10-07). Si el pipeline se ejecuta con fechas fuera de este intervalo, no habrá datos de origen disponibles para su procesamiento, lo que podría generar errores en la ejecución.
 
 El pipeline corre en tres pasos:
 
