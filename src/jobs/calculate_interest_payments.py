@@ -2,7 +2,6 @@ from src.interest_calculation import InterestCalculator
 from src.utils import parse_args
 from src.logger import Logger
 from src.spark_manager import SparkSessionManager
-from src.email_notifier import EmailNotifier
 
 logger = Logger().get_logger()
 
