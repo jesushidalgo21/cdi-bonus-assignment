@@ -77,7 +77,6 @@ class CDCDataValidator:
     
     def _validate_required_fields(self) -> None:
         """Valida que campos obligatorios no sean nulos"""
-        # Verificar existencia de columnas
         missing_cols = [f for f in self.REQUIRED_FIELDS if f not in self.df.columns]
         if missing_cols:
             message = f"❌ Faltan columnas requeridas: {missing_cols}"
@@ -85,7 +84,6 @@ class CDCDataValidator:
             logger.error(message)
             return
         
-        # Verificar valores nulos
         null_condition = None
         for field in self.REQUIRED_FIELDS:
             cond = col(field).isNull()

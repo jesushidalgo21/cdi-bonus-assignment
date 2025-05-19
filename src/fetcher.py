@@ -109,8 +109,6 @@ class CDIDataFetcher:
                 logger.warning("No se encontraron datos CDI para el período especificado")
                 return False
 
-            cdi_df.show(20, False)
-
             # 2. Guardar en formato particionado
             self._save_cdi_rates(cdi_df, output_path)
             

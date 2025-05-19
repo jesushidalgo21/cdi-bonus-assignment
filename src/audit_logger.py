@@ -1,4 +1,4 @@
-from pyspark.sql import SparkSession
+from pyspark.sql import SparkSession, DataFrame
 from datetime import datetime
 import uuid
 from src.utils import get_postgres_connection
@@ -8,84 +8,60 @@ from src.schemas import audit_log_schema
 logger = Logger().get_logger()
 
 class InterestAuditLogger:
+    """
+    Auditoría eficiente de decisiones de cálculo de interés.
+    Permite registrar logs directamente como DataFrame y guardarlos en PostgreSQL sin usar collect().
+    """
     def __init__(self, spark: SparkSession = None):
         self.job_id = str(uuid.uuid4())
         self.job_timestamp = datetime.now()
-        self.audit_data = []
         self.spark = spark
-    
-    def log_decision(self, 
-                    user_id: str, 
-                    account_id: str,
-                    qualified: bool,
-                    reason: str,
-                    relevant_balance: float,
-                    calculated_interest: float,
-                    interest_rate: float,
-                    status: str = "success",
-                    error_desc: str = None,
-                    partition_date: str = None) -> None:
-        """
-        Registra una decisión de interés para un usuario
-        
-        Args:
-            user_id: ID del usuario
-            account_id: ID de la cuenta
-            qualified: Si calificó para interés
-            reason: Razón de la decisión
-            relevant_balance: Balance considerado
-            calculated_interest: Interés calculado
-            interest_rate: Tasa aplicada
-            status: Estado del proceso
-            error_desc: Descripción de error si aplica
-            partition_date: Fecha de partición
-        """
-        record = {
-            "job_id": self.job_id,
-            "job_timestamp": self.job_timestamp,
-            "user_id": user_id or "UNKNOWN_USER", 
-            "account_id": account_id or "UNKNOWN_ACCOUNT",
-            "qualified": qualified,
-            "reason": reason or "No reason provided",
-            "relevant_balance": relevant_balance if relevant_balance is not None else 0.0,
-            "calculated_interest": calculated_interest if calculated_interest is not None else 0.0, 
-            "interest_rate": interest_rate if interest_rate is not None else 0.0,
-            "process_status": status or "unknown",
-            "error_description": error_desc,
-            "partition_date": partition_date
-        }
-        self.audit_data.append(record)
 
-    def save_to_postgres(self, config: dict) -> None:
+    def create_audit_df(self, audit_rdd, job_id, job_timestamp, partition_date=None) -> DataFrame:
         """
-        Guarda los registros de auditoría en PostgreSQL
-        
-        Args:
-            config: Diccionario con configuración de conexión
+        Recibe un RDD de tuplas con los campos de auditoría y devuelve un DataFrame listo para guardar.
         """
-        if not self.audit_data:
+        def enrich(record):
+            # record: (user_id, account_id, qualified, reason, relevant_balance, calculated_interest, interest_rate, process_status, error_desc, partition_date)
+            return {
+                "job_id": job_id,
+                "job_timestamp": job_timestamp,
+                "user_id": record[0] or "UNKNOWN_USER",
+                "account_id": record[1] or "UNKNOWN_ACCOUNT",
+                "qualified": record[2],
+                "reason": record[3] or "No reason provided",
+                "relevant_balance": record[4] if record[4] is not None else 0.0,
+                "calculated_interest": record[5] if record[5] is not None else 0.0,
+                "interest_rate": record[6] if record[6] is not None else 0.0,
+                "process_status": record[7] or "unknown",
+                "error_description": record[8],
+                "partition_date": record[9] if partition_date is None else partition_date
+            }
+        enriched_rdd = audit_rdd.map(enrich)
+        return self.spark.createDataFrame(enriched_rdd, schema=audit_log_schema)
+
+    def save_to_postgres_df(self, audit_df: DataFrame, config: dict) -> None:
+        """
+        Guarda el DataFrame de auditoría en PostgreSQL.
+        """
+        if audit_df.rdd.isEmpty():
             logger.warning("No hay datos de auditoría para guardar")
             return
 
         try:
-            # Crear DataFrame de Spark con esquema explícito
-            audit_df = self.spark.createDataFrame(self.audit_data, schema=audit_log_schema)
-            
-            # Obtener configuración de PostgreSQL
             pg_conf = config["postgres"]
             jdbc_url, connection_props = get_postgres_connection(pg_conf)
             table = f"{pg_conf['schema']}.{pg_conf['interest_audit_log_table']}"
             logger.info(f"Guardando logs de auditoría en {table}")
 
-            # Escribir en PostgreSQL
             audit_df.write.jdbc(
                 url=jdbc_url,
                 table=table,
-                mode="append",
+                mode="overwrite", # append
                 properties=connection_props
             )
-            logger.info(f"Guardados {len(self.audit_data)} registros de auditoría")
-            logger.info("✅ Logs de auditoría guardados exitosamente")        
+            logger.info(f"Guardados {audit_df.count()} registros de auditoría")
+            logger.info("✅ Logs de auditoría guardados exitosamente")
         except Exception as e:
             logger.error(f"Error al guardar logs de auditoría: {str(e)}", exc_info=True)
             raise
